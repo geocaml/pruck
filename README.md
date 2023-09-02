@@ -3,7 +3,7 @@ Pruck
 
 *Status: WIP & Experimental*
 
-A simple dataframe library in OCaml trying to strike a balance between the types and untyped world.
+A simple dataframe library in OCaml trying to strike a balance between the typed and untyped world.
 
 In order to have types for your column values, you will need to provide column names tagged with the kind
 of elements you expect that column to contain.
