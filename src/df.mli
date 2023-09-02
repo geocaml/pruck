@@ -41,7 +41,7 @@ val v : ('a, t) Column.columns -> 'a
     }]
 *)
 
-val read_csv : ?columns: _ Column.columns -> _ Eio.Path.t -> t
+val read_csv : ?columns:_ Column.columns -> _ Eio.Path.t -> t
 (** [read_csv ?columns path] will read [path] as a CSV file. If no
     [columns] are supplied then they will be inferred. If columns
     are supplied then only those columns will be read.

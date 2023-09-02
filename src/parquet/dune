@@ -1,0 +1,11 @@
+(library
+ (name parquet)
+ (flags :standard -safe-string -warn-error -3-9-27-33-35-39)
+ (public_name pruck.parquet)
+ (libraries eio eio.unix thrift))
+
+; (rule
+;  (deps format.thrift)
+;  (mode promote)
+;  (targets format_consts.ml format_types.ml format_types.mli)
+;  (action (run thrift --gen ocaml -out . %{deps})))

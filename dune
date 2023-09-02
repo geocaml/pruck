@@ -1,1 +1,4 @@
-(mdx (libraries eio_main eio eio.unix pruck))
+(vendored_dirs eio thrift)
+
+(mdx
+ (libraries eio_main eio eio.unix pruck))

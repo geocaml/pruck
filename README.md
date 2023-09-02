@@ -50,7 +50,7 @@ val df : Df.t = <abstr>
 Pruck supports reading from the following file formats:
 
  - CSV
- - Parquet
+ - Parquet (WIP)
 
 For example, consider the following CSV file.
 
