@@ -1,2 +1,3 @@
 (test
- (name pruck))
+ (name test)
+ (libraries pruck))

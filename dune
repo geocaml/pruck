@@ -1,1 +1,1 @@
-(mdx (libraries pruck))
+(mdx (libraries eio_main eio eio.unix pruck))

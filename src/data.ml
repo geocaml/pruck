@@ -1,6 +1,8 @@
 type 'a data =
   | Int : int array -> int array data
   | Float : float array -> float array data
+  | String : string array -> string array data
+  | Bool : bool array -> bool array data
 
 module Value = struct
   type t =
@@ -18,18 +20,26 @@ end
 let get (type a) : a array data -> int -> a = fun v idx -> match v with
   | Int arr -> Array.get arr idx
   | Float arr -> Array.get arr idx
+  | String arr -> Array.get arr idx
+  | Bool arr -> Array.get arr idx
 
-let get_value (type a) : a array data -> int -> Value.t = fun v idx -> match v with
+let get_value (type a) : a data -> int -> Value.t = fun v idx -> match v with
   | Int arr -> Value.Int (Array.get arr idx)
   | Float arr -> Value.Float (Array.get arr idx)
+  | String arr -> Value.String (Array.get arr idx)
+  | Bool arr -> Value.Bool (Array.get arr idx)
 
 let set (type a) : a array data -> int -> a -> unit = fun v idx -> match v with
   | Int arr -> Array.set arr idx
   | Float arr -> Array.set arr idx
+  | String arr -> Array.set arr idx
+  | Bool arr -> Array.set arr idx
 
-let length (type a) : a array data -> int = function
+let length (type a) : a data -> int = function
   | Int arr -> Array.length arr
   | Float arr -> Array.length arr
+  | String arr -> Array.length arr
+  | Bool arr -> Array.length arr
 
 type 'a rows =
   | [] : 'a rows

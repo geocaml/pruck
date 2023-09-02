@@ -1,4 +1,4 @@
 (library
  (public_name pruck)
  (name pruck)
- (libraries brands))
+ (libraries eio csv))
