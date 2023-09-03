@@ -41,9 +41,22 @@ val v : ('a, t) Column.columns -> 'a
     }]
 *)
 
+(** {2 From Files}
+
+    Currently only CSV files are supported for both reading and writing dataframes.
+    Parquet files are supported for reading.
+*)
+
 val read_csv : ?columns:_ Column.columns -> _ Eio.Path.t -> t
 (** [read_csv ?columns path] will read [path] as a CSV file. If no
     [columns] are supplied then they will be inferred. If columns
     are supplied then only those columns will be read.
 
     @raises Failure If a column is specified that does not exist in the CSV. *)
+
+val read_parquet : ?columns:_ Column.columns -> _ Eio.Path.t -> unit
+(** [read_csv ?columns path] will read [path] as a parquet file. If no
+    [columns] are supplied then they will be inferred. If columns
+    are supplied then only those columns will be read.
+
+    @raises Failure If a column is specified that does not exist in the file. *)

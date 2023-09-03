@@ -1,4 +1,4 @@
 (library
  (public_name pruck)
  (name pruck)
- (libraries eio csv))
+ (libraries eio csv parquet))

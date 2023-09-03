@@ -232,3 +232,38 @@ let read_csv ?columns path =
                 collect (DataMap.Cons ((c, data), acc)) cs
           in
           { data = DataMap.Map (collect DataMap.Nil headers_to_use) })
+
+let rec columns_of_parquet_type : Column.t list -> (string * Parquet.Format.SchemaElement.type') list -> Column.t list = fun acc -> function
+  | [] -> List.rev acc
+  | (name, Parquet.Format.SchemaElement.INT64) :: xs ->
+    let v = Column.(Hidden (Int name)) in
+    columns_of_parquet_type (v :: acc) xs
+  | (name, Parquet.Format.SchemaElement.DOUBLE) :: xs ->
+    let v = Column.(Hidden (Float name)) in
+    columns_of_parquet_type (v :: acc) xs
+  | _ -> assert false
+
+let read_parquet ?columns:_ path =
+  let metadata = Parquet.of_file path in
+  let schema =
+    let open Parquet.Format in
+    List.filter_map (fun v ->
+      match SchemaElement.name v, SchemaElement.type' v with
+      | Some name, Some type' -> Some (name, type')
+      | _ -> None) (File.schema metadata)
+  in
+  let columns = columns_of_parquet_type [] schema in
+  let column_chunks =
+    let open Parquet.Format in
+    File.row_groups metadata
+    |> List.map RowGroup.columns
+    |> List.concat
+  in
+  let offset_and_types =
+    let open Parquet.Format in
+    List.map (fun chunk -> Column.Chunk.offset chunk |> Option.get, Column.Chunk.metadata chunk |> fun v -> Option.bind v Column.Metadata.type' |> Option.get) column_chunks
+  in
+  Eio.traceln "Reading parquet...";
+  Eio.traceln "Schema names: %a" Fmt.(list ~sep:(Fmt.any ", ") Column.pp) columns;
+  Eio.traceln "%a" Fmt.(list ~sep:(Fmt.any ", ") (pair int64 Parquet.Format.Column.Metadata.pp_type)) offset_and_types
+

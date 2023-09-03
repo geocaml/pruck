@@ -28,7 +28,7 @@ let transport_of_flow flow =
 
 let protocol flow = new TCompactProtocol.t (transport_of_flow flow)
 
-module F = struct
+module Format = struct
   module Column = struct
     module Metadata = struct
       type t = Format_types.columnMetaData
@@ -61,6 +61,7 @@ module F = struct
 
       let metadata (t : t) = t#get_meta_data
       let file_path (t : t) = t#get_file_path
+      let offset (t : t) = t#get_file_offset
     end
   end
 
@@ -70,6 +71,23 @@ module F = struct
     let total_byte_size (t : t) = t#get_total_byte_size
     let num_rows (t : t) = t#get_num_rows
     let columns (t : t) = Option.value ~default:[] t#get_columns
+  end
+
+  module SchemaElement = struct
+    type t = Format_types.schemaElement
+
+    type type' = Format_types.Type.t =
+      | BOOLEAN
+      | INT32
+      | INT64
+      | INT96
+      | FLOAT
+      | DOUBLE
+      | BYTE_ARRAY
+      | FIXED_LEN_BYTE_ARRAY
+
+    let name (t : t) = t#get_name
+    let type' (t : t) = t#get_type
   end
 
   module File = struct
@@ -84,6 +102,16 @@ module F = struct
 
     let num_rows (t : t) = t#get_num_rows
     let row_groups (t : t) = Option.value ~default:[] t#get_row_groups
+    let schema (t : t) = Option.value ~default:[] t#get_schema
+  end
+
+  module Page = struct
+    module Header = struct
+      type t = Format_types.pageHeader
+
+      let type' (t : t) = t#get_type
+      let uncompressed_size (t : t) = t#get_uncompressed_page_size
+    end
   end
 end
 
@@ -101,14 +129,6 @@ let of_file path =
     let meta_off =
       Int64.to_int @@ Int64.sub size Int64.(add (of_int32 length) 8L)
     in
-    F.File.read ~off:meta_off path
+    Format.File.read ~off:meta_off path
   in
-  let column_types =
-    F.File.row_groups metadata
-    |> List.map F.RowGroup.columns
-    |> List.map (List.filter_map F.Column.Chunk.metadata)
-    |> List.map (List.filter_map F.Column.Metadata.type')
-  in
-  Eio.traceln "Length %a"
-    Fmt.(list @@ list ~sep:(Fmt.any ", ") F.Column.Metadata.pp_type)
-    column_types
+  metadata
