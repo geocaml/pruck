@@ -4,6 +4,7 @@ type 'a column =
   | String : string -> string array column
   | Bool : string -> bool array column
 
+val default_value : 'a array column -> 'a
 val pp_column : 'a column Fmt.t
 
 val equal : 'a column -> 'b column -> ('a, 'b) Type.eq option

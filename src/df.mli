@@ -28,6 +28,9 @@ val set : t -> 'a array Column.column -> int -> 'a -> unit
 (** [set df column idx element] will set the element at index [idx]
     in [column] to [element]. *)
 
+val where : t -> 'a array Column.column -> ('a -> bool) -> unit
+(** Essentially a filter *)
+
 val empty : _ Column.columns -> t
 (** Create an empty dataframe from a list of columns *)
 
@@ -41,9 +44,15 @@ val v : ('a, t) Column.columns -> 'a
     }]
 *)
 
-val read_csv : ?columns:_ Column.columns -> _ Eio.Path.t -> t
+val pp : t Fmt.t
+(** A pretty printer for dataframes *)
+
+val read_csv :
+  ?fill_default:bool -> ?columns:_ Column.columns -> _ Eio.Path.t -> t
 (** [read_csv ?columns path] will read [path] as a CSV file. If no
     [columns] are supplied then they will be inferred. If columns
     are supplied then only those columns will be read.
 
+    @param fill_default If set to [true] then default values will be filled for
+                        values that fail to parse. Default is [false].
     @raises Failure If a column is specified that does not exist in the CSV. *)

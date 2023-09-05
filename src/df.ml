@@ -1,11 +1,89 @@
 open Eio
 module Data = Data
 
+module Bitmask : sig
+  type t
+
+  val create : int -> t
+  val count : t -> int
+  val unset : t -> int -> unit
+  val all_set : t -> int list
+
+  (* val set : t -> int -> unit *)
+  val get : t -> int -> bool
+end = struct
+  type t = { b : bytes; size : int; mutable set : int }
+
+  let count t = t.set
+
+  let create i =
+    if i < 0 then invalid_arg "Bit mask must be greater than or equal to 0";
+    let n = (i / 8) + 1 in
+    let b = Bytes.create n in
+    Bytes.fill b 0 n (Char.chr 255);
+    { b; size = i; set = i }
+
+  let unset t i =
+    (* i / 8 *)
+    let v = t.b in
+    let b = i lsr 3 in
+    if b > Bytes.length v then invalid_arg "Out of bounds bitmask"
+    else
+      let byte = Bytes.get_int8 v b in
+      (* i mod 8 *)
+      let r = i land 7 in
+      let new_b = byte land lnot (1 lsl r) in
+      Bytes.set_int8 v b new_b;
+      t.set <- t.set - 1
+
+  (* let set t i =
+     (* i / 8 *)
+     let v = t.b in
+     let b = i lsr 3 in
+     if b > Bytes.length v then invalid_arg "Out of bounds bitmask"
+     else begin
+       let byte = Bytes.get_int8 v b in
+       (* i mod 8 *)
+       let r = i land 7 in
+       let new_b = byte lor (1 lsl r) in
+       Bytes.set_int8 v b new_b;
+       t.set <- t.set + 1
+     end *)
+
+  let get t i =
+    (* i / 8 *)
+    let t = t.b in
+    let b = i lsr 3 in
+    if b > Bytes.length t then invalid_arg "Out of bounds bitmask"
+    else
+      let r = Bytes.get_int8 t b in
+      let mask = 1 lsl (i land 7) in
+      r land mask <> 0
+
+  let all_set t =
+    let r = ref [] in
+    for idx = 0 to t.size - 1 do
+      if get t idx then r := idx :: !r
+    done;
+    List.rev !r
+end
+
 module DataMap = struct
   type 'a data = Nil : 'a data | Cons : 'a entry * 'b data -> 'b data
   and 'a entry = 'a Column.column * 'a Data.data
 
   type hidden = H : 'a Data.data -> hidden
+
+  let reverse d =
+    let r = ref Nil in
+    let rec loop = function
+      | Nil -> ()
+      | Cons (e, es) ->
+          r := Cons (e, !r);
+          loop es
+    in
+    loop d;
+    !r
 
   let lookup_exn (type a) (col : a Column.column) data : a Data.data =
     let rec lookup : type b c. b data -> a Data.data = function
@@ -30,26 +108,52 @@ module DataMap = struct
 
   type t = Map : _ data -> t
 
-  let length (Map data) =
+  let length_data data =
     let rec loop : type a b. int -> _ data -> int =
      fun acc -> function Nil -> acc | Cons (_, es) -> loop (1 + acc) es
     in
     loop 0 data
+
+  let length (Map data) = length_data data
+
+  let columns data =
+    let rec loop acc = function
+      | Nil -> List.rev acc
+      | Cons ((c, _), rest) -> loop (Column.Hidden c :: acc) rest
+    in
+    loop [] data
+
+  let values data =
+    (* The accumulator with list might atually be better :S *)
+    let arr = Array.make (length_data data) [||] in
+    let rec loopi i = function
+      | Nil -> ()
+      | Cons ((_, v), rest) ->
+          let vs = Data.to_value_array v in
+          arr.(i) <- vs;
+          loopi (i + 1) rest
+    in
+    loopi 0 data;
+    arr
 end
 
-type t = { data : DataMap.t }
+type t = { data : DataMap.t; index_mask : Bitmask.t }
 
 let columns t = DataMap.length t.data
 
-let rows t =
+let interal_rows t =
+  (* DOES NOT LOOK AT THE BITMASK! *)
   let (DataMap.Map d) = t.data in
   match d with
   | DataMap.Nil -> assert false
   | DataMap.Cons ((_, v), _) -> Data.length v
 
+let rows t = Bitmask.count t.index_mask
+
 let get (type a) t (col : a array Column.column) idx : a =
   let (DataMap.Map map) = t.data in
   let data = DataMap.lookup_exn col map in
+  assert (Bitmask.get t.index_mask idx);
   Data.get data idx
 
 module Value = Data.Value
@@ -63,6 +167,12 @@ let set (type a) t (col : a array Column.column) idx (el : a) : unit =
   let (DataMap.Map map) = t.data in
   let data = DataMap.lookup_exn col map in
   Data.set data idx el
+
+let where (type a) t (col : a array Column.column) (pred : a -> bool) : unit =
+  let (DataMap.Map map) = t.data in
+  let data = DataMap.lookup_exn col map in
+  let indices = Data.unfilter_index pred data in
+  List.iter (Bitmask.unset t.index_mask) indices
 
 let empty_data_of_column : type a. a Column.column -> a Data.data = function
   | Int _ -> Data.Int (Array.make 0 0)
@@ -79,9 +189,15 @@ let empty columns =
     | e :: es -> loop es (DataMap.Cons ((e, empty_data_of_column e), acc))
   in
   let data = loop columns DataMap.Nil in
-  { data = DataMap.Map data }
+  { data = DataMap.Map data; index_mask = Bitmask.create 0 }
 
 let v columns =
+  let length = ref (-1) in
+  let set_length l =
+    if Int.equal !length (-1) then length := l
+    else if not (Int.equal !length l) then invalid_arg "Mismatch in data length"
+    else ()
+  in
   let rec f_aux : type f c. t -> (f, t) Column.columns -> f =
    fun t v ->
     match v with
@@ -89,33 +205,89 @@ let v columns =
     | (Column.Int _ as v) :: tl ->
         fun x ->
           let (DataMap.Map acc) = t.data in
+          set_length (Array.length x);
+          let index_mask = Bitmask.create !length in
           let v =
-            { data = DataMap.Map (DataMap.Cons ((v, Data.Int x), acc)) }
+            {
+              data = DataMap.Map (DataMap.Cons ((v, Data.Int x), acc));
+              index_mask;
+            }
           in
           f_aux v tl
     | (Column.Float _ as v) :: tl ->
         fun x ->
           let (DataMap.Map acc) = t.data in
+          set_length (Array.length x);
+          let index_mask = Bitmask.create !length in
           let v =
-            { data = DataMap.Map (DataMap.Cons ((v, Data.Float x), acc)) }
+            {
+              data = DataMap.Map (DataMap.Cons ((v, Data.Float x), acc));
+              index_mask;
+            }
           in
           f_aux v tl
     | (Column.String _ as v) :: tl ->
         fun x ->
           let (DataMap.Map acc) = t.data in
+          set_length (Array.length x);
+          let index_mask = Bitmask.create !length in
           let v =
-            { data = DataMap.Map (DataMap.Cons ((v, Data.String x), acc)) }
+            {
+              data = DataMap.Map (DataMap.Cons ((v, Data.String x), acc));
+              index_mask;
+            }
           in
           f_aux v tl
     | (Column.Bool _ as v) :: tl ->
         fun x ->
           let (DataMap.Map acc) = t.data in
+          set_length (Array.length x);
+          let index_mask = Bitmask.create !length in
           let v =
-            { data = DataMap.Map (DataMap.Cons ((v, Data.Bool x), acc)) }
+            {
+              data = DataMap.Map (DataMap.Cons ((v, Data.Bool x), acc));
+              index_mask;
+            }
           in
           f_aux v tl
   in
-  f_aux { data = DataMap.(Map Nil) } columns
+  let index_mask = Bitmask.create 0 in
+  f_aux { data = DataMap.(Map Nil); index_mask } columns
+
+let transpose_arr vs =
+  let col_length = Array.length vs in
+  let cols = Array.length vs.(0) in
+  let arr = Array.make_matrix cols col_length (Data.Value.Int 0) in
+  Array.iteri
+    (fun r row -> Array.iteri (fun c col -> arr.(c).(r) <- col) row)
+    vs;
+  arr
+
+let pp ppf t =
+  let r = rows t in
+  let c = columns t in
+  let (DataMap.Map data) = t.data in
+  let cols = DataMap.columns data in
+  let vs = DataMap.values data |> transpose_arr in
+  let is = Bitmask.all_set t.index_mask in
+  Eio.traceln "%i %a" (List.length is) Fmt.(list int) is;
+  let vs =
+    let off = ref 0 in
+    let vals = Array.make (List.length is) [||] in
+    Array.iteri
+      (fun i row ->
+        if List.mem i is then (
+          vals.(!off) <- row;
+          incr off)
+        else ())
+      vs;
+    vals
+  in
+  Fmt.pf ppf "<%i columns x %i rows>@.%a@.%a" c r
+    Fmt.(list ~sep:(Fmt.any ", ") Column.pp)
+    cols
+    Fmt.(array (array ~sep:(Fmt.any ", ") Value.pp))
+    vs
 
 let parse_csv_line s =
   (* TODO: this probably allocates a lot *)
@@ -155,12 +327,27 @@ let transpose (vs : string list list) =
   List.iteri (fun r row -> List.iteri (fun c col -> arr.(c).(r) <- col) row) vs;
   arr
 
+let convert ?(fill_default = false) v conv arg =
+  try conv arg
+  with Failure msg ->
+    if fill_default then Column.default_value v
+    else Fmt.failwith "%s failed (ctx: trying to parse %s)" msg arg
+
 let data_of_array :
-    type a. string array array -> int -> a Column.column -> a Data.data =
- fun arr idx -> function
-  | Column.Int _ -> Data.Int (Array.map int_of_string arr.(idx))
-  | Column.Float _ -> Data.Float (Array.map float_of_string arr.(idx))
-  | Column.Bool _ -> Data.Bool (Array.map bool_of_string arr.(idx))
+    type a.
+    ?fill_default:bool ->
+    string array array ->
+    int ->
+    a Column.column ->
+    a Data.data =
+ fun ?fill_default arr idx v ->
+  match v with
+  | Column.Int _ ->
+      Data.Int (Array.map (convert ?fill_default v int_of_string) arr.(idx))
+  | Column.Float _ ->
+      Data.Float (Array.map (convert ?fill_default v float_of_string) arr.(idx))
+  | Column.Bool _ ->
+      Data.Bool (Array.map (convert ?fill_default v bool_of_string) arr.(idx))
   | Column.String _ -> Data.String arr.(idx)
 
 let rec column_exists :
@@ -173,7 +360,7 @@ let rec column_exists :
       | Some Type.Equal -> Some idx)
 
 (* TODO: It would be nice to use the CSV library directly but it uses bytes :( *)
-let read_csv ?columns path =
+let read_csv ?fill_default ?columns path =
   Path.with_open_in path @@ fun flow ->
   let lines = Buf_read.lines (Buf_read.of_flow ~max_size:max_int flow) in
   match lines () with
@@ -226,9 +413,12 @@ let read_csv ?columns path =
             |> List.map parse_csv_line |> transpose
           in
           let rec collect acc = function
-            | [] -> acc
+            | [] -> DataMap.reverse acc
             | (Column.Hidden c, idx) :: cs ->
-                let data = data_of_array all idx c in
+                let data = data_of_array ?fill_default all idx c in
                 collect (DataMap.Cons ((c, data), acc)) cs
           in
-          { data = DataMap.Map (collect DataMap.Nil headers_to_use) })
+          let data = DataMap.Map (collect DataMap.Nil headers_to_use) in
+          let v = { data; index_mask = Bitmask.create 0 } in
+          let len = interal_rows v in
+          { data; index_mask = Bitmask.create len })

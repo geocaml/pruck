@@ -4,6 +4,12 @@ type 'a column =
   | String : string -> string array column
   | Bool : string -> bool array column
 
+let default_value : type a. a array column -> a = function
+  | Int _ -> Int.zero
+  | Float _ -> Float.nan
+  | String _ -> String.empty
+  | Bool _ -> false
+
 let pp_column : type a. a column Fmt.t =
  fun ppf -> function
   | Int i -> Fmt.pf ppf "%s : int" i

@@ -1,4 +1,4 @@
-(vendored_dirs eio thrift)
+(vendored_dirs eio ocaml-arrow thrift)
 
 (mdx
- (libraries eio_main eio eio.unix pruck))
+ (libraries eio_main eio eio.unix pruck fmt))

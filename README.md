@@ -86,6 +86,9 @@ val df : Df.t = <abstr>
 - : int = 25
 # Df.get df height 1;;
 - : float = 1.83
+# Fmt.str "%a" Df.pp df;;
+- : string =
+"<2 columns x 2 rows>\nage : int, height : float\n24, 1.81\n25, 1.83"
 ```
 
 Things will go wrong if you ask for a column that we cannot find.
