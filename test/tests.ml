@@ -30,9 +30,9 @@ end
 let main path =
   let df = Df.read_csv ~fill_default:true ~columns:C.all path in
   Df.where df C.area_name (String.equal "Cambridge");
-  Eio.traceln "%a" Df.pp df
+  Fmt.pr "%a" Df.pp df
 
 let () =
   Eio_main.run @@ fun env ->
   let cwd = Stdenv.cwd env in
-  main Path.(cwd / "test/gov-uk-cycling.csv")
+  main Path.(cwd / "gov-uk-cycling.csv")

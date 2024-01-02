@@ -20,7 +20,13 @@
  (name pruck)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune)
+ (depends
+  ocaml
+  dune
+  eio
+  csv
+  (mdx :with-test)
+  (eio_main :with-test))
  (tags
   (topics "to describe" your project)))
 

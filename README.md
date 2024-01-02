@@ -3,7 +3,16 @@ Pruck
 
 *Status: WIP & Experimental*
 
-A simple dataframe library in OCaml trying to strike a balance between the typed and untyped world.
+A simple dataframe library in OCaml trying to strike a balance between the typed
+and untyped world. To get started make sure you install the dependencies with:
+
+```
+opam install . --deps-only --with-test
+```
+
+Alternatively, check the [opam file](./pruck.opam) to see what you need.
+
+## Usage
 
 In order to have types for your column values, you will need to provide column names tagged with the kind
 of elements you expect that column to contain.

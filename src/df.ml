@@ -270,7 +270,6 @@ let pp ppf t =
   let cols = DataMap.columns data in
   let vs = DataMap.values data |> transpose_arr in
   let is = Bitmask.all_set t.index_mask in
-  Eio.traceln "%i %a" (List.length is) Fmt.(list int) is;
   let vs =
     let off = ref 0 in
     let vals = Array.make (List.length is) [||] in
