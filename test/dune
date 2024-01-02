@@ -1,3 +1,4 @@
-(test
- (name test)
+(tests
+ (names tests)
+ (deps gov-uk-cycling.csv)
  (libraries eio_main pruck))
