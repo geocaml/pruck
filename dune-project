@@ -25,6 +25,7 @@
   dune
   eio
   csv
+  (mdx :with-test)
   (eio_main :with-test))
  (tags
   (topics "to describe" your project)))
