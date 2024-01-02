@@ -5,6 +5,16 @@ Pruck
 
 A simple dataframe library in OCaml trying to strike a balance between the typed and untyped world.
 
+## Prerequisits
+
+Pruck currently depends on you having installed:
+
+* csv
+* eio
+* eio_main
+
+## Usage
+
 In order to have types for your column values, you will need to provide column names tagged with the kind
 of elements you expect that column to contain.
 
