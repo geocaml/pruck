@@ -3,15 +3,14 @@ Pruck
 
 *Status: WIP & Experimental*
 
-A simple dataframe library in OCaml trying to strike a balance between the typed and untyped world.
+A simple dataframe library in OCaml trying to strike a balance between the typed
+and untyped world. To get started make sure you install the dependencies with:
 
-## Prerequisits
+```
+opam install . --deps-only --with-test
+```
 
-Pruck currently depends on you having installed:
-
-* csv
-* eio
-* eio_main
+Alternatively, check the [opam file](./pruck.opam) to see what you need.
 
 ## Usage
 

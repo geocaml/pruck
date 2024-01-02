@@ -12,6 +12,9 @@ bug-reports: "https://github.com/patricoferris/pruck/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.9"}
+  "eio"
+  "csv"
+  "eio_main" {with-test}
   "odoc" {with-doc}
 ]
 build: [
